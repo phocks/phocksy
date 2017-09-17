@@ -124,7 +124,7 @@
       "metadata": {
         "source": "github.readme"
       },
-      "html": "<h1>a bot for phocks</h1>\n<p>This is a simple Twitter bot.</p>\n<p>You can <a href=\"http://twitter.com/phocks\">follow me here</a>. </p>\n<p><strong>Powered by <a href=\"https://glitch.com\">Glitch</a></strong></p>\n<p>\\ &#x309C;o&#x309C;)&#x30CE;</p>\n"
+      "html": "<h1>a bot for phocks</h1>\n<p>This is a twitter helper to help you do things on twitter.</p>\n<p>You can <a href=\"http://twitter.com/phocks\">follow me here</a>. </p>\n<p><strong>Powered by <a href=\"https://glitch.com\">Glitch</a></strong></p>\n<p>\\ &#x309C;o&#x309C;)&#x30CE;</p>\n"
     },
     {
       "component": "footer",
