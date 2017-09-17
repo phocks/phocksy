@@ -4,74 +4,124 @@ const path = require('path'),
       Twit = require('twit'),
       config = {     
         twitter: {
-          consumer_key: process.env.CONSUMER_KEY,
-          consumer_secret: process.env.CONSUMER_SECRET,
-          access_token: process.env.ACCESS_TOKEN,
-          access_token_secret: process.env.ACCESS_TOKEN_SECRET
+          consumer_key:         process.env.CONSUMER_KEY,
+          consumer_secret:      process.env.CONSUMER_SECRET,
+          access_token:         process.env.ACCESS_TOKEN,
+          access_token_secret:  process.env.ACCESS_TOKEN_SECRET,
+          timeout_ms:           60*1000,
         }
       },
-      Bot = new Twit(config.twitter),
-      stream = Bot.stream('statuses/sample'),
-      TWITTER_SEARCH_PHRASE = 'cowspiracy',
-      blockedUsernames = [
-        'SSF_BERF_DEFM'
-      ];
+      T = new Twit(config.twitter);
+
+const low = require('lowdb')
+const FileSync = require('lowdb/adapters/FileSync')
+
+const adapter = new FileSync('.data/db.json')
+const db = low(adapter)
+
+// Set some defaults
+db.defaults({ friends: [] })
+  .write()
+
+
+// console.log(
+// db.set('friends', ['hello!'])
+// .write()
+// )
 
 app.use(express.static('public'));
 
+app.set('json spaces', 4);
+
+app.get("/loadfriends", (request, response) => {
+  T.get('friends/ids', { screen_name: 'phocks' },  function (err, data, res) {
+    // Add a post
+    db.set('friends', data.ids)
+      .write();
+    response.json(data);
+  })
+});
+
 app.all("/" + process.env.BOT_ENDPOINT, function (request, response) {
+
   
-  var query = {
-    q: TWITTER_SEARCH_PHRASE,
-    result_type: "recent"
-  }
+  // Put recurring stuff here
+  
+  let friends = db.get('friends').value();
+  
 
-  Bot.get('search/tweets', query, function (error, data, response) {
-    if (error) {
-      console.log('Bot could not find latest tweet, - ' + error);
-    }
-    else {
-      var id = {
-        id : data.statuses[0].id_str
-      }
-      
-      var currentUser = data.statuses[0].user.screen_name;
-      
-      console.log(data.statuses[0]);
-      
-      console.log(currentUser);
-      console.log(data.statuses[0].text);
-      
-      
-      // Check if user is blocked otherwise continue
-      if (blockedUsernames.indexOf(currentUser) > -1) {
-        // In the array
-        console.log('Blocked user ' + currentUser + " found. Not continuing...");
-      } else {
-        // Not in the array
-        Bot.post('statuses/retweet/:id', id, function (error, response) {
-          if (error) {
-            console.log('Bot could not retweet, - ' + error);
-          }
-          else {
-            console.log('Bot retweeted : ' + id.id);
-          }
-        });
+    console.log(friends[0].toString());
 
-        Bot.post('favorites/create', id, function (error, response) {
-          if (error) {
-            console.log('Bot could not fav, - ' + error);
-          }
-          else {
-            console.log('Bot faved : ' + id.id);
-          }
+    setIntervalX(function() {
+      T.post('friendships/update', { user_id: friends[0], retweets: 'false' }, (err, data, res) => {
+        // if (err) response.send(err);
+        if (err) console.log(err);
+        
+          console.log('Removed retweets from ' + friends[0]);
+          friends.shift();
+          db.set('friends', friends)
+            .write();
+      
+          console.log("Left to do: " + friends.length)
         });
-      }
-    } // else not error
-  });
-  response.sendStatus(200);
+      },
+        2000, // Seconds between calls
+        15 // How many times
+      );
+  
+      
+    
+response.send('ok');
+
+  
 }); // app.all Express call
+
+app.get("/testing", (request, response) => {
+  T.get('friends/ids', { screen_name: 'phocks' },  function (err, data, res) {
+    // db.set('friends', data.ids)
+    //   .write();
+    response.json(data);
+  })
+});
 
 var listener = app.listen(process.env.PORT, function () {
   console.log('Your bot is running on port ' + listener.address().port);
 });
+
+
+
+
+//
+//  filter the twitter public stream by the word 'mango'.
+//
+// var stream = T.stream('statuses/filter', { track: 'potato' })
+
+// stream.on('tweet', function (tweet) {
+//     response.json(tweet);
+// })
+  
+  //
+  // filter the public stream by the latitude/longitude bounded box of San Francisco
+  // [[[152.5396728516,-27.7783416122],[153.4680175781,-27.7783416122],[153.4680175781,-27.1935714141],[152.5396728516,-27.1935714141],[152.5396728516,-27.7783416122]]]
+//   var brisbane = [ '152.5396728516', '-27.7783416122', '153.4680175781', '-27.1935714141' ]
+
+//   var stream = T.stream('statuses/filter', { locations: brisbane })
+  
+//   stream.on('tweet', function (tweet) {
+//       response.json(tweet);
+//   })
+
+
+
+
+function setIntervalX(callback, delay, repetitions) {
+    var x = 0;
+    var intervalID = setInterval(function () {
+
+       callback();
+
+       if (++x === repetitions) {
+           clearInterval(intervalID);
+       }
+    }, delay);
+}

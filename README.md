@@ -1,7 +1,7 @@
 a bot for phocks
 ===================================
 
-This is a simple Twitter bot.
+This is a twitter helper to help you do things on twitter.
 
 You can [follow me here](http://twitter.com/phocks). 
 
