@@ -47,12 +47,23 @@ app.all("/" + process.env.BOT_ENDPOINT, function (request, response) {
   
   // Put recurring stuff here
   
-  let friends = db.get('friends').value();
+  let friends = db.get('friends').value() || [];
+  
+  if (!friends[0]) {
+    response.status(500);
+    response.send('No friends left...');
+    return false;
+  }
   
 
-    console.log(friends[0].toString());
+    console.log(friends);
 
-    setIntervalX(function() {
+    setIntervalX(muteUser,
+        2000, // Seconds between calls
+        15 // How many times
+      );
+  
+  function removeRetweet () {
       T.post('friendships/update', { user_id: friends[0], retweets: 'false' }, (err, data, res) => {
         // if (err) response.send(err);
         if (err) console.log(err);
@@ -64,10 +75,21 @@ app.all("/" + process.env.BOT_ENDPOINT, function (request, response) {
       
           console.log("Left to do: " + friends.length)
         });
-      },
-        2000, // Seconds between calls
-        15 // How many times
-      );
+      }
+  
+  function muteUser () {
+      T.post('mutes/users/create', { user_id: friends[0] }, (err, data, res) => {
+        // if (err) response.send(err);
+        if (err) console.log(err);
+        
+          console.log('Muted user ' + friends[0]);
+          friends.shift();
+          db.set('friends', friends)
+            .write();
+      
+          console.log("Left to do: " + friends.length)
+        });
+      }
   
       
     
@@ -88,28 +110,6 @@ var listener = app.listen(process.env.PORT, function () {
   console.log('Your bot is running on port ' + listener.address().port);
 });
 
-
-
-
-//
-//  filter the twitter public stream by the word 'mango'.
-//
-// var stream = T.stream('statuses/filter', { track: 'potato' })
-
-// stream.on('tweet', function (tweet) {
-//     response.json(tweet);
-// })
-  
-  //
-  // filter the public stream by the latitude/longitude bounded box of San Francisco
-  // [[[152.5396728516,-27.7783416122],[153.4680175781,-27.7783416122],[153.4680175781,-27.1935714141],[152.5396728516,-27.1935714141],[152.5396728516,-27.7783416122]]]
-//   var brisbane = [ '152.5396728516', '-27.7783416122', '153.4680175781', '-27.1935714141' ]
-
-//   var stream = T.stream('statuses/filter', { locations: brisbane })
-  
-//   stream.on('tweet', function (tweet) {
-//       response.json(tweet);
-//   })
 
 
 
