@@ -1,3 +1,8 @@
+const fox = require('fox-js');
+
+const low = require('lowdb')
+const FileSync = require('lowdb/adapters/FileSync')
+
 const path = require('path'),
       express = require('express'),
       app = express(),   
@@ -13,8 +18,7 @@ const path = require('path'),
       },
       T = new Twit(config.twitter);
 
-const low = require('lowdb')
-const FileSync = require('lowdb/adapters/FileSync')
+
 
 const adapter = new FileSync('.data/db.json')
 const db = low(adapter)
@@ -50,17 +54,20 @@ app.all("/" + process.env.BOT_ENDPOINT, function (request, response) {
   let friends = db.get('friends').value() || [];
   
   if (!friends[0]) {
-    response.status(500);
+    response.status(200);
+    console.log('No friends left...');
     response.send('No friends left...');
     return false;
   }
   
 
-    console.log(friends);
+    // console.log(friends);
+  
+  console.log('starting operation')
 
-    setIntervalX(muteUser,
-        2000, // Seconds between calls
-        15 // How many times
+    fox.setIntervalX(muteUser,
+        1 * 1000, // Milliseconds between calls
+        20 // How many times
       );
   
   function removeRetweet () {
@@ -109,19 +116,3 @@ app.get("/testing", (request, response) => {
 var listener = app.listen(process.env.PORT, function () {
   console.log('Your bot is running on port ' + listener.address().port);
 });
-
-
-
-
-
-function setIntervalX(callback, delay, repetitions) {
-    var x = 0;
-    var intervalID = setInterval(function () {
-
-       callback();
-
-       if (++x === repetitions) {
-           clearInterval(intervalID);
-       }
-    }, delay);
-}

@@ -9,7 +9,8 @@
   "dependencies": {
     "twit": "^2.2.9",
     "express": "^4.15.4",
-    "lowdb": "^1.0.0"
+    "lowdb": "^1.0.0",
+    "fox-js": "^0.1.0"
   },
   "engines": {
     "node": "6.9.1"
