@@ -8,7 +8,7 @@
   },
   "dependencies": {
     "twit": "^2.2.9",
-    "express": "^4.15.4",
+    "express": "^4.16.1",
     "lowdb": "^1.0.0",
     "fox-js": "^0.1.0"
   },
