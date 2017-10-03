@@ -21,6 +21,7 @@ const path = require('path'),
 const adapter = new FileSync('.data/db.json');
 const db = low(adapter);
 
+
 // Set some defaults
 db.defaults({ friends: [] })
   .write()
@@ -29,37 +30,70 @@ db.defaults({ friends: [] })
 app.use(express.static('public'));
 
 app.all("/" + process.env.BOT_ENDPOINT, function (request, response) {
-  console.log("triggered");
+  console.log("The bot has been triggered!!!");
   var query = {
-    q: "thinking about going vegan",
+    q: "javascript -filter:nativeretweets",
     result_type: "recent",
-    lang: "en"
+    lang: "en",
+    count: 100
   }
 
   T.get('search/tweets', query, function (error, data, response) {
     if (error) {
-      console.log('Bot could not find latest tweet, - ' + error);
+      console.log('Bot could not find latest tweets, - ' + error);
     }
     else {
-      var id = {
-        id : data.statuses[0].id_str
+      var userList = "";
+      // console.log(data);
+      data.statuses.forEach(function (d, i) {
+        // console.log(d.user.screen_name);
+        if (userList === "") userList = userList + d.user.screen_name;
+        else userList = userList + "," + d.user.screen_name;
+      });
+      
+      console.log(userList);
+      
+      var params ={
+        screen_name: userList,
+        owner_screen_name: "phocks",
+        slug: "javascripters"
       }
       
-      var currentUser = data.statuses[0].user.screen_name;
       
-      // mailNotify(data);
       
-      console.log("Current user: " + currentUser);
-      console.log(data.statuses[0].text);
+      // Uncomment below to process
       
-      T.post('favorites/create', id, function (error, response) {
-          if (error) {
+      T.post('lists/members/create_all', params, function (error, response) {
+        if (error) {
             console.log('Bot could not fav, - ' + error);
           }
           else {
-            console.log('Bot faved : ' + id.id);
+            console.log("Completed...")
+            console.log(response);
           }
-        });
+      });
+      
+      
+      
+      
+//       var id = {
+//         id : data.statuses[0].id_str
+//       }
+      
+//       var currentUser = data.statuses[0].user.screen_name;
+    
+      
+//       console.log("Current user: " + currentUser);
+//       console.log(data.statuses[0].text);
+      
+      // T.post('favorites/create', id, function (error, response) {
+      //     if (error) {
+      //       console.log('Bot could not fav, - ' + error);
+      //     }
+      //     else {
+      //       console.log('Bot faved : ' + id.id);
+      //     }
+      //   });
       
     }
       
