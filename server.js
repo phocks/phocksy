@@ -38,25 +38,9 @@ app.use(express.static("public"));
 app.all("/" + process.env.BOT_ENDPOINT, async function(request, response) {
   console.log("The bot has been triggered!!!!");
   
-  var result = await searchTweets('"thinking about going vegan" -filter:nativeretweets -filter:replies')
+  addToList();
   
-  console.log("About to fav this tweet: " + result.id_str);
   
-  favTweet(result.id_str);
-  
-  var screenName = getScreenName(result);
-  
-  console.log("Found new tweet: " + screenName + ": " + result.text);
-  
-  if (screenName !== getLastFollowed()) {
-    await followUser(screenName);
-    await removeRetweets(screenName);
-    await muteUser(screenName);
-  } else {
-    console.log("Already followed...");
-  }
-  
-  setLastFollowed(screenName);
 
   response.sendStatus(200);
 }); // app.all Express call
@@ -65,9 +49,9 @@ app.all("/" + process.env.BOT_ENDPOINT, async function(request, response) {
 // Other endpoints
 app.all("/test", async (request, response) => {
   
-  // checkFriendFollows();
+  checkFriendFollows();
   
-  favTweet("923363472221409280");
+  
   
   response.sendStatus(200);
 });
@@ -88,6 +72,28 @@ var listener = app.listen(process.env.PORT, function() {
 });
 
 // Functions below here ay
+
+async function searchAndFollow() {
+  var result = await searchTweets('"try going vegan" -filter:nativeretweets -filter:replies')
+  
+  console.log("About to fav this tweet: " + result.id_str);
+  
+  favTweet(result.id_str);
+  
+  var screenName = getScreenName(result);
+  
+  console.log("Found new tweet: " + screenName + ": " + result.text);
+  
+  if (screenName !== getLastFollowed()) {
+    await followUser(screenName);
+    await removeRetweets(screenName);
+    await muteUser(screenName);
+  } else {
+    console.log("Already followed...");
+  }
+  
+  setLastFollowed(screenName);
+}
 
 async function favTweet(tweetId) {
   T.post('favorites/create', {id: tweetId}, function (error, response) {
@@ -121,8 +127,12 @@ async function checkFriendFollows() {
       unfollowId(friend);
     }
     
-    // TODO: .shift() friends in db and save
+    friends.shift() // Remove first item in array
     
+    db.set('friends', friends) // Write changes to db
+      .write();
+    
+    console.log("Process seemed to go OK...")
   }
 }
 
@@ -194,7 +204,7 @@ async function searchTweets(query) {
 
 function addToList() {
   var query = {
-    q: "brisbane -filter:nativeretweets",
+    q: 'i love dogs" -filter:nativeretweets -filter:replies',
     result_type: "recent",
     lang: "en",
     count: 100
@@ -216,7 +226,7 @@ function addToList() {
       var params = {
         screen_name: userList,
         owner_screen_name: "phocks",
-        slug: "bristalk"
+        slug: "interesting-people"
       };
 
       // Uncomment below to process
