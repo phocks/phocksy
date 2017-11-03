@@ -40,6 +40,11 @@ app.all("/" + process.env.BOT_ENDPOINT, async function(request, response) {
   
   addToList();
   
+  fox.setIntervalX(checkFriendFollows,
+    1 * 1000, // Milliseconds between calls
+    15 // How many times
+  );
+  
   
 
   response.sendStatus(200);
@@ -49,7 +54,12 @@ app.all("/" + process.env.BOT_ENDPOINT, async function(request, response) {
 // Other endpoints
 app.all("/test", async (request, response) => {
   
-  checkFriendFollows();
+  
+  
+      fox.setIntervalX(checkFriendFollows,
+        1 * 1000, // Milliseconds between calls
+        15 // How many times
+      );
   
   
   
@@ -114,7 +124,7 @@ async function checkFriendFollows() {
     console.log("No friends left to process...")
   } else {
     
-    let friend = String(friends[0]);
+    let friend = String(friends[0]); // Strings work better than integers in Twitter
     
     console.log("Checking if this friend follows: " + friend);
     
@@ -138,7 +148,7 @@ async function checkFriendFollows() {
 
 function unfollowId(userId) {
   T.post('friendship/destroy', { user_id: userId}, (error, data, response) => {
-          if (error) console.log(error);
+          if (error) console.log(error.message);
          });
 }
 
@@ -254,7 +264,13 @@ function getScreenName(tweet) {
 }
 
 async function isFollowingMe(userId) {
-  var response = await T.get("users/lookup", { user_id: userId });
+  var response = await T.get("users/lookup", { user_id: userId }); // 300 per 15 min windows allowed
+  
+  if (response.data.errors) {
+    console.log("there was an error, most likely user doesn't exist any more");
+    return false;
+  }
+  
   if (response.data[0].following) {
     return true;
   } else {
