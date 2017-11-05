@@ -27,9 +27,6 @@ db.defaults({ friends: [] }).write();
 // Serve the public directory directly
 app.use(express.static("public"));
 
-
-
-
 /*
  *
  * THE MAIN LOOP TRIGGERED EVERY 25 MINS
@@ -37,45 +34,36 @@ app.use(express.static("public"));
  */
 app.all("/" + process.env.BOT_ENDPOINT, async function(request, response) {
   console.log("The bot has been triggered!!!!");
-  
+
   addToList();
-  
-  fox.setIntervalX(checkFriendFollows,
+
+  fox.setIntervalX(
+    checkFriendFollows,
     1 * 1000, // Milliseconds between calls
     15 // How many times
   );
-  
-  
 
   response.sendStatus(200);
 }); // app.all Express call
 
-
 // Other endpoints
 app.all("/test", async (request, response) => {
-  
-  
-  
-      fox.setIntervalX(checkFriendFollows,
-        1 * 1000, // Milliseconds between calls
-        15 // How many times
-      );
-  
-  
-  
+  fox.setIntervalX(
+    checkFriendFollows,
+    1 * 1000, // Milliseconds between calls
+    15 // How many times
+  );
+
   response.sendStatus(200);
 });
 
 app.get("/loadfriends", (request, response) => {
-  T.get('friends/ids', { screen_name: 'phocks' },  function (err, data, res) {
+  T.get("friends/ids", { screen_name: "phocks" }, function(err, data, res) {
     // Add a post
-    db.set('friends', data.ids)
-      .write();
+    db.set("friends", data.ids).write();
     response.json(data);
-  })
+  });
 });
-
-
 
 var listener = app.listen(process.env.PORT, function() {
   console.log("Your bot is running on port " + listener.address().port);
@@ -84,16 +72,18 @@ var listener = app.listen(process.env.PORT, function() {
 // Functions below here ay
 
 async function searchAndFollow() {
-  var result = await searchTweets('"try going vegan" -filter:nativeretweets -filter:replies')
-  
+  var result = await searchTweets(
+    '"try going vegan" -filter:nativeretweets -filter:replies'
+  );
+
   console.log("About to fav this tweet: " + result.id_str);
-  
+
   favTweet(result.id_str);
-  
+
   var screenName = getScreenName(result);
-  
+
   console.log("Found new tweet: " + screenName + ": " + result.text);
-  
+
   if (screenName !== getLastFollowed()) {
     await followUser(screenName);
     await removeRetweets(screenName);
@@ -101,73 +91,72 @@ async function searchAndFollow() {
   } else {
     console.log("Already followed...");
   }
-  
+
   setLastFollowed(screenName);
 }
 
 async function favTweet(tweetId) {
-  T.post('favorites/create', {id: tweetId}, function (error, response) {
+  T.post("favorites/create", { id: tweetId }, function(error, response) {
     if (error) {
-      console.log('Bot could not fav, - ' + error);
-    }
-    else {
-      console.log('Bot faved : ' + tweetId);
+      console.log("Bot could not fav, - " + error);
+    } else {
+      console.log("Bot faved : " + tweetId);
     }
   });
 }
 
 async function checkFriendFollows() {
-  
-  let friends = db.get('friends').value() || [];
-  
+  let friends = db.get("friends").value() || [];
+
   if (!friends[0]) {
-    console.log("No friends left to process...")
+    console.log("No friends left to process...");
   } else {
-    
     let friend = String(friends[0]); // Strings work better than integers in Twitter
-    
+
     console.log("Checking if this friend follows: " + friend);
-    
+
     let isFollowing = await isFollowingMe(friend);
-    
+
     console.log("Are they following? " + isFollowing);
-    
+
     if (!isFollowing) {
       console.log("Unfollowing: " + friend);
       unfollowId(friend);
     }
-    
-    friends.shift() // Remove first item in array
-    
-    db.set('friends', friends) // Write changes to db
+
+    friends.shift(); // Remove first item in array
+
+    db
+      .set("friends", friends) // Write changes to db
       .write();
-    
-    console.log("Process seemed to go OK...")
+
+    console.log("Process seemed to go OK...");
+    console.log("Accounts to go: " + friends.length);
   }
 }
 
 function unfollowId(userId) {
-  T.post('friendship/destroy', { user_id: userId}, (error, data, response) => {
-          if (error) console.log(error.message);
-         });
+  T.post("friendship/destroy", { user_id: userId }, (error, data, response) => {
+    if (error) console.log(error.message);
+  });
 }
 
 function getLastFollowed() {
-  var x = db.get('lastFollowed')
-    .value();
-  
+  var x = db.get("lastFollowed").value();
+
   return x;
 }
 
 function setLastFollowed(screenName) {
-  db.set("lastFollowed", screenName)
-    .write();
+  db.set("lastFollowed", screenName).write();
 }
 
 async function followUser(screenName) {
   try {
-    var response = await T.post('friendships/create', { screen_name: screenName } );
-    
+    var response = await T.post("friendships/create", {
+      screen_name: screenName
+    });
+
     console.log("Sending follow request: " + screenName); //, response.data);
   } catch (error) {
     console.log(error);
@@ -176,24 +165,27 @@ async function followUser(screenName) {
 
 async function muteUser(screenName) {
   try {
-    var response = await T.post('mutes/users/create', { screen_name: screenName  });
-    
+    var response = await T.post("mutes/users/create", {
+      screen_name: screenName
+    });
+
     console.log("Sending mute request: " + screenName);
   } catch (error) {
     console.log(error);
   }
-  
 }
 
 async function removeRetweets(screenName) {
   try {
-    var response = await T.post('friendships/update', { screen_name: screenName, retweets: 'false' });
-    
+    var response = await T.post("friendships/update", {
+      screen_name: screenName,
+      retweets: "false"
+    });
+
     console.log("Removing retweets from: " + screenName); //, response.data);
   } catch (error) {
     console.log(error);
   }
-  
 }
 
 async function searchTweets(query) {
@@ -203,18 +195,18 @@ async function searchTweets(query) {
     lang: "en",
     count: 100
   };
-  
-  var response = await T.get("search/tweets", query)
-  
+
+  var response = await T.get("search/tweets", query);
+
   // var index = randomNumber(100);
   var index = 0;
-  
+
   return response.data.statuses[index];
 }
 
 function addToList() {
   var query = {
-    q: 'i love dogs" -filter:nativeretweets -filter:replies',
+    q: "love dogs -filter:nativeretweets -filter:replies",
     result_type: "recent",
     lang: "en",
     count: 100
@@ -255,22 +247,18 @@ function addToList() {
 
 // app.set('json spaces', 4);
 
-
-
-
-
 function getScreenName(tweet) {
   return tweet.user.screen_name;
 }
 
 async function isFollowingMe(userId) {
   var response = await T.get("users/lookup", { user_id: userId }); // 300 per 15 min windows allowed
-  
+
   if (response.data.errors) {
     console.log("there was an error, most likely user doesn't exist any more");
     return false;
   }
-  
+
   if (response.data[0].following) {
     return true;
   } else {
@@ -281,7 +269,6 @@ async function isFollowingMe(userId) {
 function randomNumber(lessThan) {
   return Math.floor(Math.random() * lessThan);
 }
-
 
 // app.all("/" + process.env.BOT_ENDPOINT, function (request, response) {
 
