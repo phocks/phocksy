@@ -37,30 +37,41 @@ app.all("/" + process.env.BOT_ENDPOINT, async function(request, response) {
 
   addToList();
 
-  fox.setIntervalX(
-    checkFriendFollows,
-    1 * 1000, // Milliseconds between calls
-    15 // How many times
-  );
+  // fox.setIntervalX(
+  //   checkFriendFollows,
+  //   1 * 1000, // Milliseconds between calls
+  //   1 // How many times
+  // );
 
   response.sendStatus(200);
 }); // app.all Express call
 
 // Other endpoints
 app.all("/test", async (request, response) => {
+  // unfollowId("87540272064304330");
+
   fox.setIntervalX(
     checkFriendFollows,
     1 * 1000, // Milliseconds between calls
-    15 // How many times
+    1 // How many times
   );
+  
+  try {
+    isFollowingMe("2942185900");
+  } catch (error) {
+    console.log(error);
+  }
 
   response.sendStatus(200);
 });
 
 app.get("/loadfriends", (request, response) => {
   T.get("friends/ids", { screen_name: "phocks" }, function(err, data, res) {
-    // Add a post
-    db.set("friends", data.ids).write();
+    var friendIds = data.ids;
+    
+    friendIds.reverse();
+    
+    db.set("friends", friendIds).write();
     response.json(data);
   });
 });
@@ -106,6 +117,8 @@ async function favTweet(tweetId) {
 }
 
 async function checkFriendFollows() {
+  console.log("");
+
   let friends = db.get("friends").value() || [];
 
   if (!friends[0]) {
@@ -115,13 +128,17 @@ async function checkFriendFollows() {
 
     console.log("Checking if this friend follows: " + friend);
 
-    let isFollowing = await isFollowingMe(friend);
+    try {
+      let isFollowing = await isFollowingMe(friend);
+      console.log("Are they following? " + isFollowing);
 
-    console.log("Are they following? " + isFollowing);
-
-    if (!isFollowing) {
-      console.log("Unfollowing: " + friend);
-      unfollowId(friend);
+      if (!isFollowing) {
+        console.log("Unfollowing: " + friend);
+        unfollowId(friend);
+      }
+    } catch (error) {
+      console.log(error);
+      return;
     }
 
     friends.shift(); // Remove first item in array
@@ -136,9 +153,13 @@ async function checkFriendFollows() {
 }
 
 function unfollowId(userId) {
-  T.post("friendship/destroy", { user_id: userId }, (error, data, response) => {
-    if (error) console.log(error.message);
-  });
+  T.post(
+    "friendships/destroy",
+    { user_id: userId },
+    (error, data, response) => {
+      if (error) console.log(error.message);
+    }
+  );
 }
 
 function getLastFollowed() {
@@ -252,14 +273,16 @@ function getScreenName(tweet) {
 }
 
 async function isFollowingMe(userId) {
-  var response = await T.get("users/lookup", { user_id: userId }); // 300 per 15 min windows allowed
+
+  var response = await T.get("friendships/lookup", { user_id: userId }); // 300 per 15 min windows allowed
 
   if (response.data.errors) {
-    console.log("there was an error, most likely user doesn't exist any more");
-    return false;
+    // console.log("there was an error, most likely user doesn't exist any more");
+    console.log(response.data.errors);
+    return true;
   }
 
-  if (response.data[0].following) {
+  if (response.data[0].connections.indexOf("followed_by") !== -1) {
     return true;
   } else {
     return false;
