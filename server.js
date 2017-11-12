@@ -38,7 +38,7 @@ app.all("/" + process.env.BOT_ENDPOINT, async function(request, response) {
   addToList();
 
   // fox.setIntervalX(
-  //   checkFriendFollows,
+  //   unmuteCycle,
   //   1 * 1000, // Milliseconds between calls
   //   1 // How many times
   // );
@@ -51,26 +51,59 @@ app.all("/test", async (request, response) => {
   // unfollowId("87540272064304330");
 
   fox.setIntervalX(
-    checkFriendFollows,
+    unUnRetweetCycle,
     1 * 1000, // Milliseconds between calls
-    1 // How many times
+    100// How many times
   );
   
-  try {
-    isFollowingMe("2942185900");
-  } catch (error) {
-    console.log(error);
-  }
+// T.get("application/rate_limit_status", (error, data, response) => {
+//   console.log(data);
+// });
 
   response.sendStatus(200);
 });
 
 app.get("/loadfriends", (request, response) => {
-  T.get("friends/ids", { screen_name: "phocks" }, function(err, data, res) {
+  T.get("friends/ids", { screen_name: "phocks", stringify_ids: true }, function(
+    err,
+    data,
+    res
+  ) {
     var friendIds = data.ids;
-    
+
     friendIds.reverse();
-    
+
+    db.set("friends", friendIds).write();
+    response.json(data);
+  });
+});
+
+app.get("/loadmutes", (request, response) => {
+  T.get("mutes/users/ids", { stringify_ids: true }, function(
+    err,
+    data,
+    res
+  ) {
+    var friendIds = data.ids;
+
+    friendIds.reverse();
+
+    db.set("friends", friendIds).write();
+    response.json(data);
+  });
+});
+
+app.get("/loadunretweeters", (request, response) => {
+  T.get("friendships/no_retweets/ids", { stringify_ids: true }, function(
+    err,
+    data,
+    res
+  ) {
+    console.log(data);
+    var friendIds = data;
+
+    friendIds.reverse();
+
     db.set("friends", friendIds).write();
     response.json(data);
   });
@@ -81,6 +114,58 @@ var listener = app.listen(process.env.PORT, function() {
 });
 
 // Functions below here ay
+
+async function unmuteCycle() {
+  console.log("");
+
+  let friends = db.get("friends").value() || [];
+
+  if (!friends[0]) {
+    console.log("No friends left to process...");
+  } else {
+    let friend = String(friends[0]); // Strings work better than integers in Twitter
+
+    console.log("unmuting: " + friend);
+
+    await unmuteUser(friend);
+
+    console.log("User unmuted: " + friend);
+
+    friends.shift(); // Remove first item in array
+
+    db
+      .set("friends", friends) // Write changes to db
+      .write();
+
+    console.log("On to next one. Process seemed to go OK...");
+    console.log("Accounts to go: " + friends.length);
+  }
+}
+
+async function unUnRetweetCycle() {
+  console.log("");
+
+  let friends = db.get("friends").value() || [];
+
+  if (!friends[0]) {
+    console.log("No friends left to process...");
+  } else {
+    let friend = String(friends[0]); // Strings work better than integers in Twitter
+
+    console.log("ununretweeting: " + friend);
+
+    await unUnRetweetUser(friend);
+
+    friends.shift(); // Remove first item in array
+
+    db
+      .set("friends", friends) // Write changes to db
+      .write();
+
+    console.log("On to next one. Process seemed to go OK...");
+    console.log("Accounts to go: " + friends.length);
+  }
+}
 
 async function searchAndFollow() {
   var result = await searchTweets(
@@ -128,17 +213,12 @@ async function checkFriendFollows() {
 
     console.log("Checking if this friend follows: " + friend);
 
-    try {
-      let isFollowing = await isFollowingMe(friend);
-      console.log("Are they following? " + isFollowing);
+    let isFollowing = await isFollowingMe(friend);
+    console.log("Are they following? " + isFollowing);
 
-      if (!isFollowing) {
-        console.log("Unfollowing: " + friend);
-        unfollowId(friend);
-      }
-    } catch (error) {
-      console.log(error);
-      return;
+    if (!isFollowing) {
+      console.log("Unfollowing: " + friend);
+      unfollowId(friend);
     }
 
     friends.shift(); // Remove first item in array
@@ -227,7 +307,7 @@ async function searchTweets(query) {
 
 function addToList() {
   var query = {
-    q: "love dogs -filter:nativeretweets -filter:replies",
+    q: '"I love animals" -filter:nativeretweets -filter:replies',
     result_type: "recent",
     lang: "en",
     count: 100
@@ -249,7 +329,7 @@ function addToList() {
       var params = {
         screen_name: userList,
         owner_screen_name: "phocks",
-        slug: "interesting-people"
+        slug: "animal-lovers"
       };
 
       // Uncomment below to process
@@ -273,7 +353,6 @@ function getScreenName(tweet) {
 }
 
 async function isFollowingMe(userId) {
-
   var response = await T.get("friendships/lookup", { user_id: userId }); // 300 per 15 min windows allowed
 
   if (response.data.errors) {
@@ -282,7 +361,10 @@ async function isFollowingMe(userId) {
     return true;
   }
 
-  if (response.data[0].connections.indexOf("followed_by") !== -1) {
+  if (
+    response.data[0] &&
+    response.data[0].connections.indexOf("followed_by") !== -1
+  ) {
     return true;
   } else {
     return false;
@@ -292,6 +374,46 @@ async function isFollowingMe(userId) {
 function randomNumber(lessThan) {
   return Math.floor(Math.random() * lessThan);
 }
+
+function muteUser(userId) {
+  T.post("mutes/users/create", { user_id: userId }, (err, data, res) => {
+    // if (err) response.send(err);
+    if (err) console.log(err);
+
+    console.log("Muted user " + userId);
+    //           friends.shift();
+    //           db.set('friends', friends)
+    //             .write();
+
+    //           console.log("Left to do: " + friends.length)
+  });
+}
+
+function unmuteUser(userId) {
+  T.post("mutes/users/destroy", { user_id: userId }, (err, data, res) => {
+    // if (err) response.send(err);
+    if (err) {
+      console.log("Error: " + err.message);
+      return;
+    } else {
+      console.log("Unmuted user " + userId);
+    }
+  });
+}
+
+function unUnRetweetUser(userId) {
+  T.post("friendships/update", { user_id: userId, retweets: true }, (err, data, res) => {
+    // if (err) response.send(err);
+    if (err) {
+      console.log("Error: " + err.message);
+      return;
+    } else {
+      console.log("ununretweeted user " + userId);
+    }
+  });
+}
+
+
 
 // app.all("/" + process.env.BOT_ENDPOINT, function (request, response) {
 
