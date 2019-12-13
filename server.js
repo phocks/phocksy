@@ -1,7 +1,14 @@
 const fox = require("fox-js"); // Some custom functions etc
+const csv = require("csv-parser");
+const fs = require("fs");
 
 const low = require("lowdb"); // Database
 const FileSync = require("lowdb/adapters/FileSync");
+
+console.log("hello!");
+
+// Helper to add delay to async functions
+const delay = duration => new Promise(resolve => setTimeout(resolve, duration));
 
 const path = require("path"),
   express = require("express"),
@@ -27,20 +34,47 @@ db.defaults({ friends: [] }).write();
 // Serve the public directory directly
 app.use(express.static("public"));
 
+let blockList = [];
+
+function updateBlockList(callback) {
+  // To load up some data from disk
+  blockList = [];
+  fs.createReadStream("block-list.csv")
+    .pipe(csv({ headers: false }))
+    .on("data", row => {
+      blockList.push(row[0]);
+    })
+    .on("end", () => {
+      console.log("CSV file successfully processed");
+      if (callback) callback();
+    });
+}
+
+updateBlockList();
+
+let processingBlockList = false;
+
 /*
  *
  * THE MAIN LOOP TRIGGERED EVERY 25 MINS
  *
  */
-app.all("/" + process.env.BOT_ENDPOINT, async function(request, response) {
+app.get("/" + process.env.BOT_ENDPOINT, async function(request, response) {
   console.log("The bot has been triggered!!!!");
 
-  addToList();
+  // Search for string and add to list
+  // addToList();
 
   // fox.setIntervalX(
-  //   unmuteCycle,
+  //   muteCycle,
   //   1 * 1000, // Milliseconds between calls
-  //   1 // How many times
+  //   11 // How many times
+  // );
+
+  // fox.setIntervalX(
+  //   checkFriendFollows,
+  //   1 * 1000, // Milliseconds between calls
+  //   15 // How many times
   // );
 
   response.sendStatus(200);
@@ -48,20 +82,87 @@ app.all("/" + process.env.BOT_ENDPOINT, async function(request, response) {
 
 // Other endpoints
 app.all("/test", async (request, response) => {
+  updateBlockList(() => {
+    processBlockList(blockList);
+  });
+
+  // Get list of blocked users and unblock
+  //   T.get("blocks/ids", async (err, data, res) => {
+  //     console.log(data.ids.length);
+
+  //     for (const id of data.ids) {
+  //       console.log(id);
+  //       await delay(500);
+  //       T.post(
+  //         "blocks/destroy",
+  //         { user_id: id.toString() },
+  //         (err, data, response) => {
+  //           console.log(data);
+  //         }
+  //       );
+  //     }
+  //   });
+
+  // Unblock (more reliable than ids)
+  //   T.get("blocks/list", async (err, data, res) => {
+  //     if (err) {
+  //       console.log(err);
+  //       return;
+  //     }
+
+  //     console.log(data.users.length);
+
+  //     for (const user of data.users) {
+  //       await delay(500);
+  //       T.post(
+  //         "blocks/destroy",
+  //         { screen_name: user.screen_name },
+  //         (err, data, response) => {
+  //           console.log(data.screen_name);
+  //         }
+  //       );
+  //     }
+  //   });
+
   // unfollowId("87540272064304330");
 
-  fox.setIntervalX(
-    unUnRetweetCycle,
-    1 * 1000, // Milliseconds between calls
-    100// How many times
-  );
-  
-// T.get("application/rate_limit_status", (error, data, response) => {
-//   console.log(data);
-// });
+  // fox.setIntervalX(
+  //   unUnRetweetCycle,
+  //   1 * 1000, // Milliseconds between calls
+  //   100// How many times
+  // );
+
+  // fox.setIntervalX(
+  //   checkFriendFollows,
+  //   1 * 1000, // Milliseconds between calls
+  //   10 // How many times
+  // );
+
+  // T.get("application/rate_limit_status", (error, data, response) => {
+  //   console.log(data);
+  // });
 
   response.sendStatus(200);
 });
+
+async function processBlockList(list) {
+  if (processingBlockList) {
+    console.log("Already processing...");
+    return;
+  }
+  processingBlockList = true;
+  // Add troll accounts to blocked list
+  for (let account of list) {
+    await delay(500);
+    T.post("blocks/create", { user_id: account }, (err, data, response) => {
+      console.log("Blocking:", account);
+      if (err) console.log(err);
+
+    });
+  }
+
+  processingBlockList = false;
+}
 
 app.get("/loadfriends", (request, response) => {
   T.get("friends/ids", { screen_name: "phocks", stringify_ids: true }, function(
@@ -79,11 +180,7 @@ app.get("/loadfriends", (request, response) => {
 });
 
 app.get("/loadmutes", (request, response) => {
-  T.get("mutes/users/ids", { stringify_ids: true }, function(
-    err,
-    data,
-    res
-  ) {
+  T.get("mutes/users/ids", { stringify_ids: true }, function(err, data, res) {
     var friendIds = data.ids;
 
     friendIds.reverse();
@@ -114,6 +211,31 @@ var listener = app.listen(process.env.PORT, function() {
 });
 
 // Functions below here ay
+async function muteCycle() {
+  console.log("");
+
+  let friends = db.get("friends").value() || [];
+
+  if (!friends[0]) {
+    console.log("No friends left to process...");
+  } else {
+    let friend = String(friends[0]); // Strings work better than integers in Twitter
+
+    console.log("muting: " + friend);
+
+    muteUser(friend);
+
+    console.log("User muted: " + friend);
+
+    friends.shift(); // Remove first item in array
+
+    db.set("friends", friends) // Write changes to db
+      .write();
+
+    console.log("On to next one. Process seemed to go OK...");
+    console.log("Accounts to go: " + friends.length);
+  }
+}
 
 async function unmuteCycle() {
   console.log("");
@@ -133,13 +255,54 @@ async function unmuteCycle() {
 
     friends.shift(); // Remove first item in array
 
-    db
-      .set("friends", friends) // Write changes to db
+    db.set("friends", friends) // Write changes to db
       .write();
 
     console.log("On to next one. Process seemed to go OK...");
     console.log("Accounts to go: " + friends.length);
   }
+}
+
+function addToList() {
+  var query = {
+    q:
+      '"JavaScript" -filter:nativeretweets -filter:replies min_faves:1 lang:en',
+    result_type: "recent",
+    lang: "en",
+    count: 100
+  };
+
+  T.get("search/tweets", query, function(error, data, response) {
+    if (error) {
+      console.log("Bot could not find latest tweets, - " + error);
+    } else {
+      var userList = "";
+
+      data.statuses.forEach(function(d, i) {
+        if (userList === "") userList = userList + d.user.screen_name;
+        else userList = userList + "," + d.user.screen_name;
+      });
+
+      console.log(userList);
+
+      var params = {
+        screen_name: userList,
+        owner_screen_name: "phocks",
+        slug: "javascript"
+      };
+
+      // Uncomment below to process
+
+      T.post("lists/members/create_all", params, function(error, response) {
+        if (error) {
+          console.log("Bot could not do it, - " + error);
+        } else {
+          console.log("Completed...");
+          // console.log(response);
+        }
+      });
+    }
+  });
 }
 
 async function unUnRetweetCycle() {
@@ -158,8 +321,7 @@ async function unUnRetweetCycle() {
 
     friends.shift(); // Remove first item in array
 
-    db
-      .set("friends", friends) // Write changes to db
+    db.set("friends", friends) // Write changes to db
       .write();
 
     console.log("On to next one. Process seemed to go OK...");
@@ -223,8 +385,7 @@ async function checkFriendFollows() {
 
     friends.shift(); // Remove first item in array
 
-    db
-      .set("friends", friends) // Write changes to db
+    db.set("friends", friends) // Write changes to db
       .write();
 
     console.log("Process seemed to go OK...");
@@ -264,17 +425,17 @@ async function followUser(screenName) {
   }
 }
 
-async function muteUser(screenName) {
-  try {
-    var response = await T.post("mutes/users/create", {
-      screen_name: screenName
-    });
+// async function muteUser(screenName) {
+//   try {
+//     var response = await T.post("mutes/users/create", {
+//       screen_name: screenName
+//     });
 
-    console.log("Sending mute request: " + screenName);
-  } catch (error) {
-    console.log(error);
-  }
-}
+//     console.log("Sending mute request: " + screenName);
+//   } catch (error) {
+//     console.log(error);
+//   }
+// }
 
 async function removeRetweets(screenName) {
   try {
@@ -303,47 +464,6 @@ async function searchTweets(query) {
   var index = 0;
 
   return response.data.statuses[index];
-}
-
-function addToList() {
-  var query = {
-    q: '"I love animals" -filter:nativeretweets -filter:replies',
-    result_type: "recent",
-    lang: "en",
-    count: 100
-  };
-
-  T.get("search/tweets", query, function(error, data, response) {
-    if (error) {
-      console.log("Bot could not find latest tweets, - " + error);
-    } else {
-      var userList = "";
-
-      data.statuses.forEach(function(d, i) {
-        if (userList === "") userList = userList + d.user.screen_name;
-        else userList = userList + "," + d.user.screen_name;
-      });
-
-      console.log(userList);
-
-      var params = {
-        screen_name: userList,
-        owner_screen_name: "phocks",
-        slug: "animal-lovers"
-      };
-
-      // Uncomment below to process
-
-      T.post("lists/members/create_all", params, function(error, response) {
-        if (error) {
-          console.log("Bot could not do it, - " + error);
-        } else {
-          console.log("Completed...");
-          // console.log(response);
-        }
-      });
-    }
-  });
 }
 
 // app.set('json spaces', 4);
@@ -402,18 +522,20 @@ function unmuteUser(userId) {
 }
 
 function unUnRetweetUser(userId) {
-  T.post("friendships/update", { user_id: userId, retweets: true }, (err, data, res) => {
-    // if (err) response.send(err);
-    if (err) {
-      console.log("Error: " + err.message);
-      return;
-    } else {
-      console.log("ununretweeted user " + userId);
+  T.post(
+    "friendships/update",
+    { user_id: userId, retweets: true },
+    (err, data, res) => {
+      // if (err) response.send(err);
+      if (err) {
+        console.log("Error: " + err.message);
+        return;
+      } else {
+        console.log("ununretweeted user " + userId);
+      }
     }
-  });
+  );
 }
-
-
 
 // app.all("/" + process.env.BOT_ENDPOINT, function (request, response) {
 
