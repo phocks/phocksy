@@ -5,7 +5,13 @@ const fs = require("fs");
 const low = require("lowdb"); // Database
 const FileSync = require("lowdb/adapters/FileSync");
 
-console.log("hello!");
+const fetch = require("node-fetch");
+const dayjs = require("dayjs");
+
+const today = dayjs().format("MM/DD/YYYY");
+const daysPrevious = dayjs()
+  .subtract(2, "days")
+  .format("MM/DD/YYYY");
 
 // Helper to add delay to async functions
 const delay = duration => new Promise(resolve => setTimeout(resolve, duration));
@@ -50,7 +56,7 @@ function updateBlockList(callback) {
     });
 }
 
-updateBlockList();
+// updateBlockList();
 
 let processingBlockList = false;
 
@@ -81,6 +87,46 @@ app.get("/" + process.env.BOT_ENDPOINT, async function(request, response) {
 }); // app.all Express call
 
 // Other endpoints
+app.all("/update-blocklist", async (request, response) => {
+  console.log("Update triggered...", today, daysPrevious);
+  blockList = [];
+
+  // Fetches the latest trollbots from Botsentinal and blocks them
+  fetch("https://botsentinel.com/blocklist", {
+    credentials: "include",
+    headers: {
+      accept:
+        "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9",
+      "accept-language": "en-AU,en;q=0.9,en-US;q=0.8",
+      "cache-control": "no-cache",
+      "content-type": "application/x-www-form-urlencoded",
+      pragma: "no-cache",
+      "sec-fetch-mode": "navigate",
+      "sec-fetch-site": "same-origin",
+      "sec-fetch-user": "?1",
+      "upgrade-insecure-requests": "1"
+    },
+    referrer: "https://botsentinel.com/blocklist",
+    referrerPolicy: "no-referrer-when-downgrade",
+    body: `categories%5B%5D=untrustworthy&categories%5B%5D=trollbot&date_pref=1&daterange=${daysPrevious}+-+${today}&zip=1&access-code=&download=1`,
+    method: "POST",
+    mode: "cors"
+  }).then(res =>
+    res.body
+      .pipe(csv({ headers: false }))
+      .on("data", row => {
+        blockList.push(row[0]);
+      })
+      .on("end", () => {
+        console.log("CSV file successfully processed");
+        // console.log(blockList);
+        processBlockList(blockList);
+      })
+  );
+
+  response.sendStatus(200);
+});
+
 app.all("/test", async (request, response) => {
   updateBlockList(() => {
     processBlockList(blockList);
@@ -157,7 +203,6 @@ async function processBlockList(list) {
     T.post("blocks/create", { user_id: account }, (err, data, response) => {
       console.log("Blocking:", account);
       if (err) console.log(err);
-
     });
   }
 
