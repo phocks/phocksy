@@ -7,12 +7,14 @@
     "start": "node server.js"
   },
   "dependencies": {
-    "twit": "^2.2.11",
-    "express": "^4.17.1",
-    "lowdb": "^1.0.0",
-    "fox-js": "^0.1.0",
+    "axios": "^0.19.1",
     "csv-parser": "^2.3.2",
-    "axios": "^0.19.0"
+    "express": "^4.17.1",
+    "fox-js": "^0.1.0",
+    "lowdb": "^1.0.0",
+    "twit": "^2.2.11",
+    "node-fetch": "^2.6.0",
+    "dayjs": "^1.8.19"
   },
   "engines": {
     "node": "8"
