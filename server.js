@@ -68,6 +68,56 @@ let processingBlockList = false;
 app.get("/" + process.env.BOT_ENDPOINT, async function(request, response) {
   console.log("The bot has been triggered!!!!");
 
+  // Get latest mentions and add to list
+  T.get("statuses/mentions_timeline", (error, data, response) => {
+    let users = [];
+    for (const record of data) {
+      users.push(record.user.id);
+    }
+
+    console.log("Found: " + users.length);
+
+    addUsersToList(users, "1280669347413848064");
+  });
+
+  // Get list of blocked users and unblock
+  //   T.get("blocks/ids", async (err, data, res) => {
+  //     console.log(data.ids.length);
+
+  //     for (const id of data.ids) {
+  //       console.log(id);
+  //       await delay(500);
+  //       T.post(
+  //         "blocks/destroy",
+  //         { user_id: id.toString() },
+  //         (err, data, response) => {
+  //           console.log(data);
+  //         }
+  //       );
+  //     }
+  //   });
+
+  // Unblock (more reliable than ids)
+  //     T.get("blocks/list", async (err, data, res) => {
+  //       if (err) {
+  //         console.log(err);
+  //         return;
+  //       }
+
+  //       console.log(data.users.length);
+
+  //       for (const user of data.users) {
+  //         await delay(500);
+  //         T.post(
+  //           "blocks/destroy",
+  //           { screen_name: user.screen_name },
+  //           (err, data, response) => {
+  //             console.log(data.screen_name);
+  //           }
+  //         );
+  //       }
+  //     });
+
   // Search for string and add to list
   // addToList();
 
@@ -87,7 +137,7 @@ app.get("/" + process.env.BOT_ENDPOINT, async function(request, response) {
 }); // app.all Express call
 
 // Other endpoints
-app.all("/update-blocklist", async (request, response) => {
+app.all("/update-blocklist1", async (request, response) => {
   console.log("Update triggered...", today, daysPrevious);
   blockList = [];
 
@@ -128,47 +178,10 @@ app.all("/update-blocklist", async (request, response) => {
 });
 
 app.all("/test", async (request, response) => {
-  updateBlockList(() => {
-    processBlockList(blockList);
-  });
-
-  // Get list of blocked users and unblock
-  //   T.get("blocks/ids", async (err, data, res) => {
-  //     console.log(data.ids.length);
-
-  //     for (const id of data.ids) {
-  //       console.log(id);
-  //       await delay(500);
-  //       T.post(
-  //         "blocks/destroy",
-  //         { user_id: id.toString() },
-  //         (err, data, response) => {
-  //           console.log(data);
-  //         }
-  //       );
-  //     }
-  //   });
-
-  // Unblock (more reliable than ids)
-  //   T.get("blocks/list", async (err, data, res) => {
-  //     if (err) {
-  //       console.log(err);
-  //       return;
-  //     }
-
-  //     console.log(data.users.length);
-
-  //     for (const user of data.users) {
-  //       await delay(500);
-  //       T.post(
-  //         "blocks/destroy",
-  //         { screen_name: user.screen_name },
-  //         (err, data, response) => {
-  //           console.log(data.screen_name);
-  //         }
-  //       );
-  //     }
-  //   });
+  // Process blocktogether list
+  // updateBlockList(() => {
+  //   processBlockList(blockList);
+  // });
 
   // unfollowId("87540272064304330");
 
@@ -649,3 +662,56 @@ function unUnRetweetUser(userId) {
 // response.send('ok');
 
 // }); // app.all Express call
+
+// THIS WAS JUST TO MOVE FOLLOWING TO A LIST SO I HAVE SOME ORIGINAL STARTING POINT
+// T.get("friends/ids", async (err, data, res) => {
+//     console.log(data.ids.length);
+
+//     let following = data.ids;
+
+//     while (following.length > 1) {
+//       let firstHundred = following.splice(0, 100);
+
+//       console.log(firstHundred.length);
+//       console.log(following.length);
+
+//       T.post(
+//         "lists/members/create_all",
+//         { list_id: "1276362310487953410", user_id: firstHundred.join() },
+//         (err, data, response) => {
+//           // console.log(data);
+//           console.log("Done one group");
+//         }
+//       );
+
+//       await delay(500);
+//     }
+//   });
+
+function addUsersToList(userIds, listId) {
+  var userList = "";
+
+  userIds.forEach(function(userId, iteration) {
+    if (userList === "") userList = userList + userId;
+    else userList = userList + "," + userId;
+  });
+
+  console.log(userList);
+
+  var params = {
+    screen_name: userList,
+    owner_screen_name: "phocks",
+    list_id: listId
+  };
+
+  // Uncomment below to process
+
+  T.post("lists/members/create_all", params, function(error, response) {
+    if (error) {
+      console.log("Bot could not do it, - " + error);
+    } else {
+      console.log("Completed...");
+      // console.log(response);
+    }
+  });
+}
