@@ -8,7 +8,7 @@
   },
   "dependencies": {
     "axios": "^0.21.1",
-    "csv-parser": "^2.3.2",
+    "csv-parser": "^2.3.5",
     "express": "^4.17.1",
     "fox-js": "^0.1.0",
     "lowdb": "^1.0.0",
