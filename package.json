@@ -9,7 +9,7 @@
   "dependencies": {
     "axios": "^0.21.1",
     "csv-parser": "^2.3.2",
-    "express": "^4.17.1",
+    "express": "^4.17.3",
     "fox-js": "^0.1.0",
     "lowdb": "^1.0.0",
     "twit": "^2.2.11",
